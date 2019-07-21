@@ -1,14 +1,16 @@
 import {
   createServerModule,
   QueryResolver,
-  SelectDirectory
+  SelectDirectory,
+  Commands,
+  Telemetry
 } from '@angular-console/server';
 import { NestFactory } from '@nestjs/core';
 import * as path from 'path';
 import { commands, ExtensionContext, window } from 'vscode';
-
-import { getStoreForContext } from './get-store-for-context';
 import { getPseudoTerminalFactory } from './pseudo-terminal.factory';
+import { environment } from '../environments/environment';
+import { VSCodeStorage } from './vscode-storage';
 
 const getPort = require('get-port'); // tslint:disable-line
 
@@ -17,7 +19,10 @@ export async function startServer(
   workspacePath?: string
 ) {
   const port = await getPort({ port: 8888 });
-  const store = getStoreForContext(context);
+  const store = VSCodeStorage.fromContext(context);
+  const telemetry = environment.disableTelemetry
+    ? Telemetry.withLogger(store)
+    : Telemetry.withGoogleAnalytics(store, 'vscode');
 
   const selectDirectory: SelectDirectory = async ({ buttonLabel }) => {
     return await window
@@ -73,15 +78,19 @@ export async function startServer(
 
   const assetsPath = path.join(context.extensionPath, 'assets', 'public');
 
-  const queryResolver = new QueryResolver(store);
-
-  // Pre-warm cache for workspace.
-  if (workspacePath) {
-    queryResolver.workspace(workspacePath, {});
-  }
-
   const providers = [
-    { provide: QueryResolver, useValue: queryResolver },
+    {
+      provide: QueryResolver,
+      useFactory: (commandsController: Commands) => {
+        const resolver = new QueryResolver(store, commandsController);
+        if (workspacePath) {
+          resolver.workspace(workspacePath, {});
+        }
+        return resolver;
+      },
+      inject: ['commands']
+    },
+    { provide: 'telemetry', useValue: telemetry },
     { provide: 'serverAddress', useValue: `http://localhost:${port}` },
     { provide: 'store', useValue: store },
     { provide: 'selectDirectory', useValue: selectDirectory },
