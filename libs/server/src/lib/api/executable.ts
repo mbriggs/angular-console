@@ -89,12 +89,15 @@ export class Executable {
         program: this.path,
         args: cmds,
         cwd,
+        isDryRun: false,
         isWsl: this.fileUtils.isWsl()
       });
 
-      commandRunning.onDidWriteData(data => {
-        this.commands.addOut(id, data);
-      });
+      if (commandRunning.onDidWriteData) {
+        commandRunning.onDidWriteData(data => {
+          this.commands.addOut(id, data);
+        });
+      }
 
       commandRunning.onExit(code => {
         const seconds = process.hrtime(start)[0];
@@ -135,7 +138,7 @@ function workspaceName(type: ExecutableType, cwd: string): string | null {
 }
 
 export interface PseudoTerminal {
-  onDidWriteData(callback: (data: string) => void): void;
+  onDidWriteData?(callback: (data: string) => void): void;
 
   onExit(callback: (code: number) => void): void;
 
@@ -149,6 +152,7 @@ export interface PseudoTerminalConfig {
   name: string;
   program: string;
   args: string[];
+  isDryRun: boolean;
   cwd: string;
   displayCommand: string;
   isWsl: boolean;

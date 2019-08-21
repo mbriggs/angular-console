@@ -1,6 +1,6 @@
 import { authUtils, Store } from '@nrwl/angular-console-enterprise-electron';
 
-import * as uuid from 'uuid/v4';
+const uuid = require('uuid/v4');
 
 export type UserState = 'untracked' | 'anonymous' | 'connected';
 
